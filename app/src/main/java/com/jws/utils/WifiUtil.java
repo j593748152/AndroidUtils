@@ -5,19 +5,22 @@ import android.content.Context;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.text.TextUtils;
 
 import java.net.Inet4Address;
+import java.util.List;
 
 public class WifiUtil {
     private final static String TAG = "WifiUtil";
 
     private Context mContext;
     private WifiManager mWifiManager;
+    private List<WifiConfiguration> mWifiConfigurations;
 
 
     //TODO 统一加密类型
     public enum WifiSecurityType {
-        WIFICIPHER_NOPASS, WIFICIPHER_WPA, WIFICIPHER_WEP, WIFICIPHER_INVALID, WIFICIPHER_WPA2
+        WIFICIPHER_NOPASS, WIFICIPHER_WEP, WIFICIPHER_WPA,  WIFICIPHER_INVALID, WIFICIPHER_WPA2
     }
     public enum WifiCipherType {
         WIFICIPHER_WEP, WIFICIPHER_WPA, WIFICIPHER_NOPASS, WIFICIPHER_INVALID
@@ -28,7 +31,7 @@ public class WifiUtil {
     public WifiUtil(Context context) {
         mContext = context;
         mWifiManager = (WifiManager) mContext.getSystemService(Context.WIFI_SERVICE);
-
+        mWifiConfigurations = mWifiManager.getConfiguredNetworks();
 
         /*获取wifi状态 
         // WIFI_STATE_DISABLED   wifi已关闭
@@ -94,18 +97,79 @@ public class WifiUtil {
     }
 
 
-        /**
-         * 无配置记录链接方式
-         *
-         * @param SSID
-         * @param Password
-         * @param Type
-         * @return true or false
-         */
-        public boolean Connect(String SSID, String Password, WifiSecurityType Type) {
-            //TODO wifi connect
-            return false;
+    /**
+     * 判断WiFi配置是否存在
+     * @param ssid
+     * @return
+     */
+    public WifiConfiguration isExsitsWificonfig(String ssid){
+        WifiConfiguration ssidWifiConfig = null;
+        for(WifiConfiguration config : mWifiConfigurations){
+            if(config.SSID.equals(ssid)){
+                ssidWifiConfig = config;
+            }
         }
+        return ssidWifiConfig;
+    }
+
+    /**
+     * wifi链接方式，已有连接会更新数据
+     *
+     * @param ssid
+     * @param Password
+     * @param Type
+     * @return true or false
+     */
+    public void Connect(String ssid, String Password, WifiSecurityType Type) {
+        //TODO wifi connect
+        WifiConfiguration connectWifiConfig ;
+        connectWifiConfig = createWifiInfo(ssid, Password, Type);
+        int i = mWifiManager.addNetwork(connectWifiConfig);
+        mWifiManager.enableNetwork(i, true);
+    }
+
+
+    public WifiConfiguration createWifiInfo(String SSID, String Password, WifiSecurityType Type) {
+        WifiConfiguration config = new WifiConfiguration();
+        config.allowedAuthAlgorithms.clear();
+        config.allowedGroupCiphers.clear();
+        config.allowedKeyManagement.clear();
+        config.allowedPairwiseCiphers.clear();
+        config.allowedProtocols.clear();
+        config.SSID = "\"" + SSID + "\"";
+        // nopass
+        if (Type == WifiSecurityType.WIFICIPHER_NOPASS) {
+            config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+        }
+        // wep
+        if (Type == WifiSecurityType.WIFICIPHER_WEP) {
+            if (!TextUtils.isEmpty(Password)) {
+                config.wepKeys[0] = "\"" + Password + "\"";
+            }
+            config.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
+            config.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.SHARED);
+            config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+            config.wepTxKeyIndex = 0;
+        }
+        // wpa
+        if (Type == WifiSecurityType.WIFICIPHER_WPA2) {
+            config.preSharedKey = "\"" + Password + "\"";
+            config.hiddenSSID = true;
+            config.allowedAuthAlgorithms
+                    .set(WifiConfiguration.AuthAlgorithm.OPEN);
+            config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
+            config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
+            config.allowedPairwiseCiphers
+                    .set(WifiConfiguration.PairwiseCipher.TKIP);
+            // 此处需要修改否则不能自动重联
+            // config.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+            config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+            config.allowedPairwiseCiphers
+                    .set(WifiConfiguration.PairwiseCipher.CCMP);
+            config.status = WifiConfiguration.Status.ENABLED;
+        }
+        return config;
+    }
 
 
     /**
